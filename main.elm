@@ -1,7 +1,6 @@
 import Html exposing (Html, div, fromElement, select, option, text, label, input, Attribute)
 import Html.Events exposing (on, targetValue)
 import Html.Attributes exposing (style, attribute, value, placeholder, type')
-import Json.Decode as Json
 import StartApp.Simple as StartApp
 import Graphics.Element exposing (show)
 import Maybe exposing (..)
@@ -34,13 +33,14 @@ type alias Model = {
     weight: Maybe Float
   }
 
+initModel : Model
 initModel = { gender = Male,
-              bodyweightUnits = Lbs,
-              partialBodyweight = "",
-              bodyweight = Nothing,
-              weightUnits = Lbs,
-              partialWeight = "",
-              weight = Nothing }
+                      bodyweightUnits = Lbs,
+                      partialBodyweight = "",
+                      bodyweight = Nothing,
+                      weightUnits = Lbs,
+                      partialWeight = "",
+                      weight = Nothing }
 
 -- Update
 type Action =
@@ -80,7 +80,7 @@ view address model =
           , field "text" address UpdateWeight "Weight" model.partialWeight
           , div [] [ div [ fieldNameStyle "160px"] [ text "Wilks Score" ]
                    , text textWilks]
-          , fromElement <| show model
+          -- , fromElement <| show model
           ]
 
 
@@ -181,5 +181,6 @@ wilksCoeffWithCoeffs a b c d e f bodyweight =
   in
     500 / (a + (b * x) + (c * (x^2)) + (d * (x^3)) + (e * (x^4)) + (f * (x^5)))
 
+main : Signal Html
 main =
   StartApp.start { model = initModel, update = update, view = view }
