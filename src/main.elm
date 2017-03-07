@@ -4,6 +4,7 @@ import Html.Attributes exposing (style, attribute, value, placeholder, type_)
 import Maybe exposing (..)
 import String
 import Json.Decode as Json
+import Wilks
 
 type Gender = Male | Female
 type Units = Kg | Lbs
@@ -52,8 +53,8 @@ type Msg =
 
 
 update : Msg -> Model -> Model
-update action model =
-  case action of
+update msg model =
+  case msg of
     UpdateGender gender -> { model | gender = gender }
     UpdateBodyweightUnits unit -> { model | bodyweightUnits = unit }
     UpdateBodyweight weight partial -> { model | bodyweight = weight, partialBodyweight = partial }
@@ -97,18 +98,18 @@ selectDiv onChange name options =
 onChangeGender : Attribute Msg
 onChangeGender =
     let
-        toAction = \x -> UpdateGender <| toGender x
+        toMsg = \x -> UpdateGender <| toGender x
     in
-        on "change" (Json.map (toAction) targetValue)
+        on "change" (Json.map (toMsg) targetValue)
 
 onChangeUnit : (String -> Msg) -> Attribute Msg
-onChangeUnit toAction =
-  on "change" (Json.map toAction targetValue)
+onChangeUnit toMsg =
+  on "change" (Json.map toMsg targetValue)
 
 
 
 field : String -> (Maybe Float -> String -> Msg) -> String -> String -> Html Msg
-field fieldType toAction name content =
+field fieldType toMsg name content =
   div []
         [ div [ fieldNameStyle "160px" ] [ label [ attribute "for" <| removeSpace name ] [text name] ]
         , input
@@ -116,20 +117,20 @@ field fieldType toAction name content =
             , placeholder name
             , value content
             , attribute "name" <| removeSpace name
-            , on "input" (Json.map (stringToAction toAction) targetValue)
+            , on "input" (Json.map (stringToMsg toMsg) targetValue)
             ]
             []
         ]
 
-stringToAction : (Maybe Float -> String -> Msg) -> String -> Msg
-stringToAction toAction string =
+stringToMsg : (Maybe Float -> String -> Msg) -> String -> Msg
+stringToMsg toMsg string =
   case (String.toFloat string) of
     Ok r ->
       if String.endsWith "." string then
-          toAction (Just r) string
+          toMsg (Just r) string
       else
-          toAction (Just r) (toString r)
-    Err _ -> toAction Nothing string
+          toMsg (Just r) (toString r)
+    Err _ -> toMsg Nothing string
 
 fieldNameStyle : String -> Attribute Msg
 fieldNameStyle px =
@@ -148,39 +149,8 @@ wilksScoreKg gender bodyweight weight =
 wilksCoeffKg : Gender -> Float -> Float
 wilksCoeffKg gender bodyweight =
   case gender of
-    Male -> maleWilksCoeffKg bodyweight
-    Female -> femaleWilksCoeffKg bodyweight
-
-maleWilksCoeffKg : Float -> Float
-maleWilksCoeffKg bodyweight =
-  let
-    a = -216.0475144
-    b = 16.2606339
-    c = -0.002388645
-    d = -0.00113732
-    e = 0.00000701863
-    f = -0.00000001291
-  in
-    wilksCoeffWithCoeffs a b c d e f bodyweight
-
-femaleWilksCoeffKg : Float -> Float
-femaleWilksCoeffKg bodyweight =
-  let
-    a = 594.31747775582
-    b = -27.23842536447
-    c = 0.82112226871
-    d = -0.00930733913
-    e = 0.00004731582
-    f = -0.00000009054
-  in
-    wilksCoeffWithCoeffs a b c d e f bodyweight
-
-wilksCoeffWithCoeffs : Float -> Float -> Float -> Float -> Float -> Float -> Float -> Float
-wilksCoeffWithCoeffs a b c d e f bodyweight =
-  let
-    x = bodyweight
-  in
-    500 / (a + (b * x) + (c * (x^2)) + (d * (x^3)) + (e * (x^4)) + (f * (x^5)))
+    Male -> Wilks.maleWilksCoeffKg bodyweight
+    Female -> Wilks.femaleWilksCoeffKg bodyweight
 
 main : Program Never Model Msg
 main =

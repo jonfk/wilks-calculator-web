@@ -4,7 +4,7 @@
 
 ```bash
 mkdir -p target
-elm-make main.elm --output target/wilks.js
+elm-make src/main.elm --output target/wilks.js
 ```
 
 ## Optimize
