@@ -1,10 +1,9 @@
-import Html exposing (Html, div, fromElement, select, option, text, label, input, Attribute)
+import Html exposing (Html, div, select, option, text, label, input, Attribute)
 import Html.Events exposing (on, targetValue)
-import Html.Attributes exposing (style, attribute, value, placeholder, type')
-import StartApp.Simple as StartApp
-import Graphics.Element exposing (show)
+import Html.Attributes exposing (style, attribute, value, placeholder, type_)
 import Maybe exposing (..)
 import String
+import Json.Decode as Json
 
 type Gender = Male | Female
 type Units = Kg | Lbs
@@ -43,7 +42,7 @@ initModel = { gender = Male,
                       weight = Nothing }
 
 -- Update
-type Action =
+type Msg =
   UpdateGender Gender |
   UpdateBodyweightUnits Units |
   UpdateBodyweight (Maybe Float) String |
@@ -52,7 +51,7 @@ type Action =
   NoOp
 
 
-update : Action -> Model -> Model
+update : Msg -> Model -> Model
 update action model =
   case action of
     UpdateGender gender -> { model | gender = gender }
@@ -63,8 +62,8 @@ update action model =
     NoOp -> model
 
 -- View
-view : Signal.Address Action -> Model -> Html
-view address model =
+view : Model -> Html Msg
+view model =
   let
     toKg = (\x -> x * 0.453592)
     bodyweight = if model.bodyweightUnits == Kg then model.bodyweight else map toKg model.bodyweight
@@ -73,64 +72,66 @@ view address model =
     textWilks = Maybe.withDefault "" <| map toString maybeWilks
   in
     div []
-          [ selectDiv address onChangeGender "Gender" ["Male", "Female"]
-          , selectDiv address (\v -> onChangeUnit v (\units -> UpdateBodyweightUnits <| toUnits units)) "Bodyweight Units" ["lbs", "kg"]
-          , selectDiv address (\v -> onChangeUnit v (\units -> UpdateWeightUnits <| toUnits units)) "Weight Units" ["lbs", "kg"]
-          , field "text" address UpdateBodyweight "Body Weight" model.partialBodyweight
-          , field "text" address UpdateWeight "Weight" model.partialWeight
+          [ selectDiv onChangeGender "Gender" ["Male", "Female"]
+          , selectDiv (onChangeUnit (\units -> UpdateBodyweightUnits <| toUnits units)) "Bodyweight Units" ["lbs", "kg"]
+          , selectDiv (onChangeUnit (\units -> UpdateWeightUnits <| toUnits units)) "Weight Units" ["lbs", "kg"]
+          , field "text" UpdateBodyweight "Body Weight" model.partialBodyweight
+          , field "text" UpdateWeight "Weight" model.partialWeight
           , div [] [ div [ fieldNameStyle "160px"] [ text "Wilks Score" ]
                    , text textWilks]
-          -- , fromElement <| show model
           ]
 
 
 removeSpace : String -> String
 removeSpace = String.filter (\char -> char /= ' ')
 
-selectDiv : Signal.Address Action -> (Signal.Address Action -> Attribute) -> String -> List String -> Html
-selectDiv address onChange name options =
+selectDiv : Attribute Msg -> String -> List String -> Html Msg
+selectDiv onChange name options =
   div []
         [ div [fieldNameStyle "160px"] [label [ attribute "for" <| removeSpace name ] [ text name ] ]
         , select [ attribute "name" <| removeSpace name
-                 ,  onChange address ] (List.map (\opt -> option [] [text opt]) options)
+                 ,  onChange ] (List.map (\opt -> option [] [text opt]) options)
         ]
 
 
-onChangeGender : Signal.Address Action -> Attribute
-onChangeGender address =
-  on "change" targetValue (\val -> Signal.message address <| UpdateGender <| toGender val)
+onChangeGender : Attribute Msg
+onChangeGender =
+    let
+        toAction = \x -> UpdateGender <| toGender x
+    in
+        on "change" (Json.map (toAction) targetValue)
 
-onChangeUnit : Signal.Address Action -> (String -> Action) -> Attribute
-onChangeUnit address toAction =
-  on "change" targetValue (\val -> Signal.message address <| toAction val)
+onChangeUnit : (String -> Msg) -> Attribute Msg
+onChangeUnit toAction =
+  on "change" (Json.map toAction targetValue)
 
 
 
-field : String -> Signal.Address Action -> (Maybe Float -> String -> Action) -> String -> String -> Html
-field fieldType address toAction name content =
+field : String -> (Maybe Float -> String -> Msg) -> String -> String -> Html Msg
+field fieldType toAction name content =
   div []
         [ div [ fieldNameStyle "160px" ] [ label [ attribute "for" <| removeSpace name ] [text name] ]
         , input
-            [ type' fieldType
+            [ type_ fieldType
             , placeholder name
             , value content
             , attribute "name" <| removeSpace name
-            , on "input" targetValue <| stringToAction address toAction
+            , on "input" (Json.map (stringToAction toAction) targetValue)
             ]
             []
         ]
 
-stringToAction : Signal.Address Action -> (Maybe Float -> String -> Action) -> String -> Signal.Message
-stringToAction address toAction string =
+stringToAction : (Maybe Float -> String -> Msg) -> String -> Msg
+stringToAction toAction string =
   case (String.toFloat string) of
     Ok r ->
       if String.endsWith "." string then
-        Signal.message address <| toAction (Just r) string
+          toAction (Just r) string
       else
-        Signal.message address <| toAction (Just r) (toString r)
-    Err _ -> Signal.message address <| toAction Nothing string
+          toAction (Just r) (toString r)
+    Err _ -> toAction Nothing string
 
-fieldNameStyle : String -> Attribute
+fieldNameStyle : String -> Attribute Msg
 fieldNameStyle px =
   style
     [ ("width", px)
@@ -181,6 +182,6 @@ wilksCoeffWithCoeffs a b c d e f bodyweight =
   in
     500 / (a + (b * x) + (c * (x^2)) + (d * (x^3)) + (e * (x^4)) + (f * (x^5)))
 
-main : Signal Html
+main : Program Never Model Msg
 main =
-  StartApp.start { model = initModel, update = update, view = view }
+  Html.beginnerProgram { model = initModel, update = update, view = view }
